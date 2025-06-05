@@ -136,15 +136,9 @@ def validate_order_data(
     # Validate and deserialize input
     try:
         schema = get_order_schema()
-        partial_fields = []
-        if not require_apikey:
-            partial_fields.append('apikey')
-        if not require_strategy:
-            partial_fields.append('strategy')
-        order_data = schema.load(
-            data,
-            partial=partial_fields if partial_fields else None
-        )
+
+        order_data = schema.load(data)
+smain
         return True, order_data, None
     except Exception as err:
         return False, None, str(err)
