@@ -23,6 +23,7 @@ def place_manual_order():
         broker_name = session.get('broker')
         if not auth_token or not broker_name:
             return jsonify({'status': 'error', 'message': 'Authentication error'}), 401
+
         success, response_data, status_code = place_order(
             order_data=data,
             auth_token=auth_token,
@@ -32,4 +33,3 @@ def place_manual_order():
     except Exception as e:
         logger.error(f"Error placing manual order: {str(e)}")
         return jsonify({'status': 'error', 'message': 'An error occurred'}), 500
-
