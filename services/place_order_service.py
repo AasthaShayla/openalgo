@@ -16,14 +16,20 @@ from utils.constants import (
     VALID_PRODUCT_TYPES,
     REQUIRED_ORDER_FIELDS
 )
-from restx_api.schemas import OrderSchema
-
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize schema
-order_schema = OrderSchema()
+# Schema will be instantiated lazily to avoid circular imports
+order_schema = None
+
+def get_order_schema():
+    """Lazily import and create OrderSchema instance."""
+    global order_schema
+    if order_schema is None:
+        from restx_api.schemas import OrderSchema
+        order_schema = OrderSchema()
+    return order_schema
 
 def import_broker_module(broker_name: str) -> Optional[Any]:
     """
@@ -115,7 +121,8 @@ def validate_order_data(data: Dict[str, Any]) -> Tuple[bool, Optional[Dict[str, 
 
     # Validate and deserialize input
     try:
-        order_data = order_schema.load(data)
+        schema = get_order_schema()
+        order_data = schema.load(data)
         return True, order_data, None
     except Exception as err:
         return False, None, str(err)

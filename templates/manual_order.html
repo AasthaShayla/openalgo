@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+
+{% block title %}Manual Order{% endblock %}
+
+{% block head %}
+<style>
+    .search-results {
+        @apply absolute w-full max-h-[300px] overflow-y-auto bg-base-100 border border-base-200 rounded-lg shadow-lg z-50;
+        display: none;
+        top: 100%;
+        margin-top: 4px;
+    }
+    .result-item {
+        @apply p-4 border-b border-base-200 hover:bg-base-200 cursor-pointer transition-all duration-200;
+    }
+    .result-item:last-child { @apply border-b-0; }
+    .loading-indicator { @apply absolute right-3 top-1/2 -translate-y-1/2; display: none; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="max-w-xl mx-auto px-4 py-6">
+    <h1 class="text-2xl font-bold mb-4">Manual Order</h1>
+    <div class="card bg-base-100 shadow-lg">
+        <div class="card-body">
+            <form id="manualOrderForm" class="space-y-4">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"/>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Symbol</span></label>
+                    <div class="relative">
+                        <input type="text" name="symbol" id="symbolSearch" class="input input-bordered w-full pr-10" autocomplete="off" required>
+                        <div class="loading-indicator"><span class="loading loading-spinner loading-sm"></span></div>
+                        <div id="searchResults" class="search-results"></div>
+                    </div>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Exchange</span></label>
+                    <select name="exchange" id="exchangeSelect" class="select select-bordered" required>
+                        <option value="NSE">NSE</option>
+                        <option value="NFO">NFO</option>
+                        <option value="BSE">BSE</option>
+                        <option value="MCX">MCX</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Quantity</span></label>
+                    <input type="number" name="quantity" min="1" step="1" class="input input-bordered w-full" required>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Action</span></label>
+                    <select name="action" class="select select-bordered" required>
+                        <option value="BUY">BUY</option>
+                        <option value="SELL">SELL</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Product Type</span></label>
+                    <select name="product_type" class="select select-bordered" required>
+                        <option value="MIS">MIS</option>
+                        <option value="CNC">CNC</option>
+                    </select>
+                </div>
+                <div class="form-control">
+                    <label class="label"><span class="label-text">Price Type</span></label>
+                    <select name="price_type" id="priceType" class="select select-bordered" required>
+                        <option value="MARKET">MARKET</option>
+                        <option value="LIMIT">LIMIT</option>
+                        <option value="SL">SL</option>
+                        <option value="SL-M">SL-M</option>
+                    </select>
+                </div>
+                <div class="form-control hidden" id="priceField">
+                    <label class="label"><span class="label-text">Price</span></label>
+                    <input type="number" name="price" step="0.05" class="input input-bordered w-full">
+                </div>
+                <div class="form-control hidden" id="triggerField">
+                    <label class="label"><span class="label-text">Trigger Price</span></label>
+                    <input type="number" name="trigger_price" step="0.05" class="input input-bordered w-full">
+                </div>
+                <button type="submit" class="btn btn-primary w-full">Place Order</button>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+let debounceTimeout;
+const loadingIndicator = document.querySelector('.loading-indicator');
+const symbolInput = document.getElementById('symbolSearch');
+const searchResults = document.getElementById('searchResults');
+const exchangeSelect = document.getElementById('exchangeSelect');
+
+symbolInput.addEventListener('input', function(e){
+    clearTimeout(debounceTimeout);
+    const query = e.target.value.trim();
+    const exchange = exchangeSelect.value;
+    if(query.length < 2){ searchResults.style.display='none'; return; }
+    debounceTimeout = setTimeout(()=>fetchSearch(query, exchange), 300);
+});
+exchangeSelect.addEventListener('change', function(){
+    const query = symbolInput.value.trim();
+    if(query.length >= 2){ fetchSearch(query, this.value); }
+});
+document.addEventListener('click', function(e){
+    if(!symbolInput.contains(e.target) && !searchResults.contains(e.target)){
+        searchResults.style.display='none';
+    }
+});
+async function fetchSearch(query, exchange){
+    try{
+        loadingIndicator.style.display='block';
+        const resp = await fetch(`{{ url_for('search_bp.api_search') }}?q=${encodeURIComponent(query)}&exchange=${encodeURIComponent(exchange)}`);
+        const data = await resp.json();
+        searchResults.innerHTML='';
+        if(data.results.length>0){
+            data.results.forEach(r=>{
+                const div=document.createElement('div');
+                div.className='result-item';
+                div.innerHTML=`<div class="flex justify-between"><span class="font-medium">${r.symbol}</span><span class="badge badge-ghost">${r.exchange}</span></div><div class="text-xs opacity-70">${r.name||''}</div>`;
+                div.addEventListener('click',()=>{symbolInput.value=r.symbol; exchangeSelect.value=r.exchange; searchResults.style.display='none';});
+                searchResults.appendChild(div);
+            });
+            searchResults.style.display='block';
+        }else{ searchResults.style.display='none'; }
+    }catch(err){
+        console.error('Search error', err);
+        showToast('Error fetching search results','error');
+    }finally{ loadingIndicator.style.display='none'; }
+}
+const priceType = document.getElementById('priceType');
+const priceField = document.getElementById('priceField');
+const triggerField = document.getElementById('triggerField');
+priceType.addEventListener('change', function(){
+    const val=this.value;
+    if(val==='LIMIT' || val==='SL' || val==='SL-M'){ priceField.classList.remove('hidden'); } else { priceField.classList.add('hidden'); }
+    if(val==='SL' || val==='SL-M'){ triggerField.classList.remove('hidden'); } else { triggerField.classList.add('hidden'); }
+});
+
+document.getElementById('manualOrderForm').addEventListener('submit', function(e){
+    e.preventDefault();
+    const payload={
+        symbol:this.symbol.value.trim(),
+        exchange:this.exchange.value,
+        quantity:this.quantity.value,
+        action:this.action.value,
+        product_type:this.product_type.value,
+        price_type:this.price_type.value,
+        price:this.price.value,
+        trigger_price:this.trigger_price.value
+    };
+    fetchWithCSRF('{{ url_for('manual_bp.place_manual_order') }}', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body:JSON.stringify(payload)
+    })
+    .then(r=>r.json().then(d=>({status:r.status,data:d})))
+    .then(({status,data})=>{
+        if(data.status==='success'){
+            showToast('Order Placed: '+(data.orderid||''),'success');
+        }else{
+            showToast(data.message||'Failed to place order','error');
+        }
+    })
+    .catch(err=>{console.error(err); showToast('Error placing order','error');});
+});
+</script>
+{% endblock %}
