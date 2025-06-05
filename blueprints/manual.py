@@ -1,6 +1,7 @@
-from flask import Blueprint, render_template, request, session, jsonify
+from flask import Blueprint, render_template, request, session, redirect, url_for, jsonify
 from utils.session import check_session_validity
 from database.auth_db import get_auth_token
+from services.place_order_service import place_order
 import logging
 
 logger = logging.getLogger(__name__)
@@ -16,8 +17,6 @@ def manual_order():
 @check_session_validity
 def place_manual_order():
     try:
-        from services.place_order_service import place_order
-
         data = request.json
         login_username = session['user']
         auth_token = get_auth_token(login_username)
@@ -34,4 +33,3 @@ def place_manual_order():
     except Exception as e:
         logger.error(f"Error placing manual order: {str(e)}")
         return jsonify({'status': 'error', 'message': 'An error occurred'}), 500
-
