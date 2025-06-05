@@ -34,4 +34,3 @@ def place_manual_order():
     except Exception as e:
         logger.error(f"Error placing manual order: {str(e)}")
         return jsonify({'status': 'error', 'message': 'An error occurred'}), 500
-
