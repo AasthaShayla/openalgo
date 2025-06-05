@@ -83,7 +83,11 @@ def emit_analyzer_error(request_data: Dict[str, Any], error_message: str) -> Dic
     
     return error_response
 
-def validate_order_data(data: Dict[str, Any]) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+def validate_order_data(
+    data: Dict[str, Any],
+    require_apikey: bool = True,
+    require_strategy: bool = True
+) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     """
     Validate order data against required fields and valid values
     
@@ -96,8 +100,18 @@ def validate_order_data(data: Dict[str, Any]) -> Tuple[bool, Optional[Dict[str, 
         - Validated order data (dict) or None if validation failed
         - Error message (str) or None if validation succeeded
     """
+    # Build required fields list depending on context
+    required_fields = [
+        field
+        for field in REQUIRED_ORDER_FIELDS
+        if (
+            (field != 'apikey' or require_apikey)
+            and (field != 'strategy' or require_strategy)
+        )
+    ]
+
     # Check for missing mandatory fields
-    missing_fields = [field for field in REQUIRED_ORDER_FIELDS if field not in data]
+    missing_fields = [field for field in required_fields if field not in data]
     if missing_fields:
         return False, None, f'Missing mandatory field(s): {", ".join(missing_fields)}'
 
@@ -122,7 +136,9 @@ def validate_order_data(data: Dict[str, Any]) -> Tuple[bool, Optional[Dict[str, 
     # Validate and deserialize input
     try:
         schema = get_order_schema()
+
         order_data = schema.load(data)
+smain
         return True, order_data, None
     except Exception as err:
         return False, None, str(err)
@@ -257,8 +273,16 @@ def place_order(
         # Also add apikey to order_data for validation
         order_data['apikey'] = api_key
     
+    # Determine whether API key/strategy fields are required
+    require_api = not (auth_token and broker) or api_key is not None
+    require_strategy = require_api
+
     # Validate the order data
-    is_valid, validated_data, error_message = validate_order_data(order_data)
+    is_valid, validated_data, error_message = validate_order_data(
+        order_data,
+        require_apikey=require_api,
+        require_strategy=require_strategy,
+    )
     if not is_valid:
         if get_analyze_mode():
             return False, emit_analyzer_error(original_data, error_message), 400
