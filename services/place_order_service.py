@@ -228,7 +228,13 @@ def place_order_with_auth(
     except Exception as e:
         logger.error(f"Error in broker_module.place_order_api: {e}")
         traceback.print_exc()
-        error_response = {'status': 'error', 'message': 'Internal error placing order'}
+        status_code = res.status
+
+        # Provide clearer message when authentication fails
+        if status_code == 401:
+            message = 'Authentication failed or session expired. Please log in again.'
+
+        return False, error_response, status_code if status_code != 200 else 500
         executor.submit(async_log_order, 'placeorder', original_data, error_response)
         return False, error_response, 500
 
