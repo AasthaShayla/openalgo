@@ -126,11 +126,11 @@ def validate_order_data(
             return False, None, f'Invalid action. Must be one of: {", ".join(VALID_ACTIONS)} (case insensitive)'
 
     # Validate price type if provided
-    if 'price_type' in data and data['price_type'] not in VALID_PRICE_TYPES:
+    if 'pricetype' in data and data['pricetype'] not in VALID_PRICE_TYPES:
         return False, None, f'Invalid price type. Must be one of: {", ".join(VALID_PRICE_TYPES)}'
 
     # Validate product type if provided
-    if 'product_type' in data and data['product_type'] not in VALID_PRODUCT_TYPES:
+    if 'product' in data and data['product'] not in VALID_PRODUCT_TYPES:
         return False, None, f'Invalid product type. Must be one of: {", ".join(VALID_PRODUCT_TYPES)}'
 
     # Validate and deserialize input
@@ -229,8 +229,8 @@ def place_order_with_auth(
             'action': order_data['action'],
             'orderid': order_id,
             'exchange': order_data.get('exchange', 'Unknown'),
-            'price_type': order_data.get('price_type', 'Unknown'),
-            'product_type': order_data.get('product_type', 'Unknown'),
+            'price_type': order_data.get('pricetype', 'Unknown'),
+            'product_type': order_data.get('product', 'Unknown'),
             'mode': 'live'
         })
         order_response_data = {'status': 'success', 'orderid': order_id}

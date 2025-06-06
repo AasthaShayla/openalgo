@@ -55,14 +55,14 @@
                 </div>
                 <div class="form-control">
                     <label class="label"><span class="label-text">Product Type</span></label>
-                    <select name="product_type" class="select select-bordered" required>
+                    <select name="product" class="select select-bordered" required>
                         <option value="MIS">MIS</option>
                         <option value="CNC">CNC</option>
                     </select>
                 </div>
                 <div class="form-control">
                     <label class="label"><span class="label-text">Price Type</span></label>
-                    <select name="price_type" id="priceType" class="select select-bordered" required>
+                    <select name="pricetype" id="priceType" class="select select-bordered" required>
                         <option value="MARKET">MARKET</option>
                         <option value="LIMIT">LIMIT</option>
                         <option value="SL">SL</option>
@@ -143,8 +143,8 @@ document.getElementById('manualOrderForm').addEventListener('submit', function(e
         exchange:this.exchange.value,
         quantity:this.quantity.value,
         action:this.action.value,
-        product_type:this.product_type.value,
-        price_type:this.price_type.value,
+        product:this.product.value,
+        pricetype:this.pricetype.value,
         price:this.price.value,
         trigger_price:this.trigger_price.value
     };
