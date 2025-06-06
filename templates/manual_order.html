@@ -155,7 +155,6 @@ document.getElementById('manualOrderForm').addEventListener('submit', function(e
     fetchWithCSRF('{{ url_for('manual_bp.place_manual_order') }}', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
-
         body:JSON.stringify(payload)
 
     })
@@ -163,6 +162,7 @@ document.getElementById('manualOrderForm').addEventListener('submit', function(e
     .then(({status,data})=>{
         if(data.status==='success'){
             showToast('Order Placed: '+(data.orderid||''),'success');
+
 
         }else{
 

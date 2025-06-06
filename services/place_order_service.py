@@ -19,7 +19,6 @@ from utils.constants import (
 )
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -243,19 +242,25 @@ def place_order_with_auth(
             'product_type': order_data.get('product', 'Unknown'),
             'mode': 'live'
         })
-        success_payload = {'status': 'success', 'orderid': order_id}
-        executor.submit(async_log_order, 'placeorder', order_request_data, success_payload)
-        return True, success_payload, 200
 
-    # If broker returns an error status
-    error_message = (
-        response_data.get('message', 'Failed to place order')
-        if isinstance(response_data, dict)
-        else 'Failed to place order'
-    )
-    error_response = {'status': 'error', 'message': error_message}
-    executor.submit(async_log_order, 'placeorder', original_data, error_response)
-    return False, error_response, res.status if res.status != 200 else 500
+        order_response_data = {'status': 'success', 'orderid': order_id}
+        executor.submit(async_log_order, 'placeorder', order_request_data, order_response_data)
+        return True, order_response_data, 200
+    else:
+        status_code = res.status
+        message = response_data.get('message', 'Failed to place order') if isinstance(response_data, dict) else 'Failed to place order'
+
+        # Provide clearer message when authentication fails
+        if status_code == 401:
+            message = 'Authentication failed or session expired. Please log in again.'
+
+        error_response = {
+            'status': 'error',
+            'message': message
+        }
+        executor.submit(async_log_order, 'placeorder', original_data, error_response)
+        return False, error_response, status_code if status_code != 200 else 500
+
 
 def place_order(
     order_data: Dict[str, Any],
