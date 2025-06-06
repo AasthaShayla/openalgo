@@ -17,7 +17,6 @@ from utils.constants import (
     VALID_PRODUCT_TYPES,
     REQUIRED_ORDER_FIELDS
 )
-
 # Configure logging
 logger = logging.getLogger(__name__)
 
@@ -317,16 +316,17 @@ def place_order(
             if not get_analyze_mode():
                 executor.submit(async_log_order, 'placeorder', original_data, error_response)
             return False, error_response, 403
-
+        
         return place_order_with_auth(validated_data, AUTH_TOKEN, broker_name, original_data)
-
-    # Case 2: Internal call with provided auth_token and broker
-    if auth_token and broker:
+    
+    # Case 2: Direct internal call with auth_token and broker
+    elif auth_token and broker:
         return place_order_with_auth(validated_data, auth_token, broker, original_data)
-
-    # Case 3: Neither path is valid
-    error_response = {
-        'status': 'error',
-        'message': 'Either api_key or both auth_token and broker must be provided'
-    }
-    return False, error_response, 400
+    
+    # Case 3: Invalid parameters
+    else:
+        error_response = {
+            'status': 'error',
+            'message': 'Either api_key or both auth_token and broker must be provided'
+        }
+        return False, error_response, 400
