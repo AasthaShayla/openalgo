@@ -22,11 +22,13 @@ from utils.constants import (
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Will hold the lazily instantiated schema
+
+# Schema will be instantiated lazily to avoid circular imports
 order_schema = None
 
 def get_order_schema():
-    """Lazily import and instantiate the OrderSchema to avoid circular imports."""
+    """Lazily import and create OrderSchema instance."""
+
     global order_schema
     if order_schema is None:
         from restx_api.schemas import OrderSchema
@@ -100,14 +102,25 @@ def validate_order_data(
         - True, loaded_data, None   if validation succeeds.
         - False, None, error_msg    if validation fails.
     """
-    # Determine which fields are mandatory in this context
+
+    if 'price_type' in data:
+        data.setdefault('pricetype', data['price_type'])
+        data.pop('price_type', None)
+    if 'product_type' in data:
+        data.setdefault('product', data['product_type'])
+        data.pop('product_type', None)
+
+    # Build required fields list depending on context
     required_fields = [
         field
         for field in REQUIRED_ORDER_FIELDS
-        if (field != 'apikey' or require_apikey) and (field != 'strategy' or require_strategy)
+        if (
+            (field != 'apikey' or require_apikey)
+            and (field != 'strategy' or require_strategy)
+        )
     ]
 
-    # Check for missing fields
+
     missing_fields = [field for field in required_fields if field not in data]
     if missing_fields:
         return False, None, f"Missing mandatory field(s): {', '.join(missing_fields)}"
@@ -122,19 +135,31 @@ def validate_order_data(
         if data['action'] not in VALID_ACTIONS:
             return False, None, f"Invalid action. Must be one of: {', '.join(VALID_ACTIONS)}"
 
-    # Validate price_type if provided
-    if 'price_type' in data and data['price_type'] not in VALID_PRICE_TYPES:
-        return False, None, f"Invalid price type. Must be one of: {', '.join(VALID_PRICE_TYPES)}"
 
-    # Validate product_type if provided
-    if 'product_type' in data and data['product_type'] not in VALID_PRODUCT_TYPES:
-        return False, None, f"Invalid product type. Must be one of: {', '.join(VALID_PRODUCT_TYPES)}"
+    # Validate price type if provided
+    if 'pricetype' in data and data['pricetype'] not in VALID_PRICE_TYPES:
+        return False, None, f'Invalid price type. Must be one of: {", ".join(VALID_PRICE_TYPES)}'
+
+    # Validate product type if provided
+    if 'product' in data and data['product'] not in VALID_PRODUCT_TYPES:
+        return False, None, f'Invalid product type. Must be one of: {", ".join(VALID_PRODUCT_TYPES)}'
+
 
     # Attempt to deserialize via schema
     try:
         schema = get_order_schema()
-        loaded_data = schema.load(data)
-        return True, loaded_data, None
+
+        partial_fields = []
+        if not require_apikey:
+            partial_fields.append('apikey')
+        if not require_strategy:
+            partial_fields.append('strategy')
+        order_data = schema.load(
+            data,
+            partial=partial_fields if partial_fields else None
+        )
+        return True, order_data, None
+
     except Exception as err:
         return False, None, str(err)
 
@@ -214,8 +239,8 @@ def place_order_with_auth(
             'action': order_data['action'],
             'orderid': order_id,
             'exchange': order_data.get('exchange', 'Unknown'),
-            'price_type': order_data.get('price_type', 'Unknown'),
-            'product_type': order_data.get('product_type', 'Unknown'),
+            'price_type': order_data.get('pricetype', 'Unknown'),
+            'product_type': order_data.get('product', 'Unknown'),
             'mode': 'live'
         })
         success_payload = {'status': 'success', 'orderid': order_id}
@@ -260,14 +285,16 @@ def place_order(
         original_data['apikey'] = api_key
         order_data['apikey'] = api_key
 
-    # Decide which fields are mandatory in validation
-    require_api_key = not (auth_token and broker) or api_key is not None
-    require_strategy = require_api_key
+    
+    # Determine whether API key/strategy fields are required
+    require_api = not (auth_token and broker) or api_key is not None
+    require_strategy = require_api
 
-    is_valid, validated_data, error_msg = validate_order_data(
+    # Validate the order data
+    is_valid, validated_data, error_message = validate_order_data(
         order_data,
-        require_apikey=require_api_key,
-        require_strategy=require_strategy
+        require_apikey=require_api,
+        require_strategy=require_strategy,
     )
 
     if not is_valid:
