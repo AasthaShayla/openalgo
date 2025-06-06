@@ -81,10 +81,12 @@ def emit_analyzer_error(request_data: Dict[str, Any], error_message: str) -> Dic
         'response': error_response
     })
 
-    return error_response
-
-def validate_order_data(
-    data: Dict[str, Any],
+    if 'price_type' in data:
+        data.setdefault('pricetype', data['price_type'])
+        data.pop('price_type', None)
+    if 'product_type' in data:
+        data.setdefault('product', data['product_type'])
+        data.pop('product_type', None)
     require_apikey: bool = True,
     require_strategy: bool = True
 ) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
