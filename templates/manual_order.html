@@ -56,6 +56,7 @@
                 <div class="form-control">
                     <label class="label"><span class="label-text">Product Type</span></label>
                     <select name="product" class="select select-bordered" required>
+
                         <option value="MIS">MIS</option>
                         <option value="CNC">CNC</option>
                     </select>
@@ -63,6 +64,7 @@
                 <div class="form-control">
                     <label class="label"><span class="label-text">Price Type</span></label>
                     <select name="pricetype" id="priceType" class="select select-bordered" required>
+
                         <option value="MARKET">MARKET</option>
                         <option value="LIMIT">LIMIT</option>
                         <option value="SL">SL</option>
@@ -139,6 +141,7 @@ priceType.addEventListener('change', function(){
 document.getElementById('manualOrderForm').addEventListener('submit', function(e){
     e.preventDefault();
     const payload={
+
         symbol:this.symbol.value.trim(),
         exchange:this.exchange.value,
         quantity:this.quantity.value,
@@ -147,17 +150,22 @@ document.getElementById('manualOrderForm').addEventListener('submit', function(e
         pricetype:this.pricetype.value,
         price:this.price.value,
         trigger_price:this.trigger_price.value
+
     };
     fetchWithCSRF('{{ url_for('manual_bp.place_manual_order') }}', {
         method:'POST',
         headers:{'Content-Type':'application/json'},
         body:JSON.stringify(payload)
+
     })
     .then(r=>r.json().then(d=>({status:r.status,data:d})))
     .then(({status,data})=>{
         if(data.status==='success'){
             showToast('Order Placed: '+(data.orderid||''),'success');
+
+
         }else{
+
             showToast(data.message||'Failed to place order','error');
         }
     })
