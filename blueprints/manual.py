@@ -3,6 +3,7 @@ from utils.session import check_session_validity
 from database.auth_db import get_auth_token
 import logging
 
+
 logger = logging.getLogger(__name__)
 
 manual_bp = Blueprint('manual_bp', __name__, url_prefix='/manualorder')
@@ -10,11 +11,13 @@ manual_bp = Blueprint('manual_bp', __name__, url_prefix='/manualorder')
 @manual_bp.route('/')
 @check_session_validity
 def manual_order():
+
     return render_template('manual_order.html')
 
 @manual_bp.route('/place', methods=['POST'])
 @check_session_validity
 def place_manual_order():
+
     try:
         from services.place_order_service import place_order
 
@@ -22,6 +25,7 @@ def place_manual_order():
         login_username = session['user']
         auth_token = get_auth_token(login_username)
         broker_name = session.get('broker')
+
         if not auth_token or not broker_name:
             return jsonify({'status': 'error', 'message': 'Authentication error'}), 401
 
