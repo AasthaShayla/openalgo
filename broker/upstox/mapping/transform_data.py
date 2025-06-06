@@ -6,24 +6,28 @@ def transform_data(data,token):
     Transforms the new API request structure to the current expected structure.
     """
     # Basic mapping
+    # Normalize numeric fields that might be provided as empty strings
+    price = data.get("price") or "0"
+    trigger = data.get("trigger_price") or "0"
+
     transformed = {
         "quantity": data["quantity"],
         "product": map_product_type(data["product"]),
-        "validity":"DAY",
-        "price": data.get("price", "0"),
+        "validity": "DAY",
+        "price": price,
         "tag": "string",
         "instrument_token": token,
         "order_type": map_order_type(data["pricetype"]),
-        "transaction_type": data['action'].upper(),
-        "disclosed_quantity": data.get("disclosed_quantity", "0"),  
-        "trigger_price": data.get("trigger_price", "0"),
+        "transaction_type": data["action"].upper(),
+        "disclosed_quantity": data.get("disclosed_quantity", "0"),
+        "trigger_price": trigger,
         "is_amo": "false"  # Assuming false as default; you might need logic to handle this if it can vary
     }
 
 
     # Extended mapping for fields that might need conditional logic or additional processing
     transformed["disclosed_quantity"] = data.get("disclosed_quantity", "0")
-    transformed["trigger_price"] = data.get("trigger_price", "0")
+    transformed["trigger_price"] = trigger
     
     return transformed
 
