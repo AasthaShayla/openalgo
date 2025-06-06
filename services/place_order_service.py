@@ -16,14 +16,19 @@ from utils.constants import (
     VALID_PRODUCT_TYPES,
     REQUIRED_ORDER_FIELDS
 )
-from restx_api.schemas import OrderSchema
-
 # Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Initialize schema
-order_schema = OrderSchema()
+# Schema will be instantiated lazily to avoid circular imports
+order_schema = None
+
+def get_order_schema():
+    """Lazily import and create OrderSchema instance."""
+    global order_schema
+    if order_schema is None:
+        from restx_api.schemas import OrderSchema
+        order_schema = OrderSchema()
+    return order_schema
 
 def import_broker_module(broker_name: str) -> Optional[Any]:
     """
@@ -77,7 +82,11 @@ def emit_analyzer_error(request_data: Dict[str, Any], error_message: str) -> Dic
     
     return error_response
 
-def validate_order_data(data: Dict[str, Any]) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
+def validate_order_data(
+    data: Dict[str, Any],
+    require_apikey: bool = True,
+    require_strategy: bool = True
+) -> Tuple[bool, Optional[Dict[str, Any]], Optional[str]]:
     """
     Validate order data against required fields and valid values
     
@@ -90,8 +99,26 @@ def validate_order_data(data: Dict[str, Any]) -> Tuple[bool, Optional[Dict[str, 
         - Validated order data (dict) or None if validation failed
         - Error message (str) or None if validation succeeded
     """
+    # Accept legacy field names by mapping them to current ones
+    if 'price_type' in data:
+        data.setdefault('pricetype', data['price_type'])
+        data.pop('price_type', None)
+    if 'product_type' in data:
+        data.setdefault('product', data['product_type'])
+        data.pop('product_type', None)
+
+    # Build required fields list depending on context
+    required_fields = [
+        field
+        for field in REQUIRED_ORDER_FIELDS
+        if (
+            (field != 'apikey' or require_apikey)
+            and (field != 'strategy' or require_strategy)
+        )
+    ]
+
     # Check for missing mandatory fields
-    missing_fields = [field for field in REQUIRED_ORDER_FIELDS if field not in data]
+    missing_fields = [field for field in required_fields if field not in data]
     if missing_fields:
         return False, None, f'Missing mandatory field(s): {", ".join(missing_fields)}'
 
@@ -106,16 +133,25 @@ def validate_order_data(data: Dict[str, Any]) -> Tuple[bool, Optional[Dict[str, 
             return False, None, f'Invalid action. Must be one of: {", ".join(VALID_ACTIONS)} (case insensitive)'
 
     # Validate price type if provided
-    if 'price_type' in data and data['price_type'] not in VALID_PRICE_TYPES:
+    if 'pricetype' in data and data['pricetype'] not in VALID_PRICE_TYPES:
         return False, None, f'Invalid price type. Must be one of: {", ".join(VALID_PRICE_TYPES)}'
 
     # Validate product type if provided
-    if 'product_type' in data and data['product_type'] not in VALID_PRODUCT_TYPES:
+    if 'product' in data and data['product'] not in VALID_PRODUCT_TYPES:
         return False, None, f'Invalid product type. Must be one of: {", ".join(VALID_PRODUCT_TYPES)}'
 
     # Validate and deserialize input
     try:
-        order_data = order_schema.load(data)
+        schema = get_order_schema()
+        partial_fields = []
+        if not require_apikey:
+            partial_fields.append('apikey')
+        if not require_strategy:
+            partial_fields.append('strategy')
+        order_data = schema.load(
+            data,
+            partial=partial_fields if partial_fields else None
+        )
         return True, order_data, None
     except Exception as err:
         return False, None, str(err)
@@ -206,21 +242,27 @@ def place_order_with_auth(
             'action': order_data['action'],
             'orderid': order_id,
             'exchange': order_data.get('exchange', 'Unknown'),
-            'price_type': order_data.get('price_type', 'Unknown'),
-            'product_type': order_data.get('product_type', 'Unknown'),
+            'price_type': order_data.get('pricetype', 'Unknown'),
+            'product_type': order_data.get('product', 'Unknown'),
             'mode': 'live'
         })
         order_response_data = {'status': 'success', 'orderid': order_id}
         executor.submit(async_log_order, 'placeorder', order_request_data, order_response_data)
         return True, order_response_data, 200
     else:
+        status_code = res.status
         message = response_data.get('message', 'Failed to place order') if isinstance(response_data, dict) else 'Failed to place order'
+
+        # Provide clearer message when authentication fails
+        if status_code == 401:
+            message = 'Authentication failed or session expired. Please log in again.'
+
         error_response = {
             'status': 'error',
             'message': message
         }
         executor.submit(async_log_order, 'placeorder', original_data, error_response)
-        return False, error_response, res.status if res.status != 200 else 500
+        return False, error_response, status_code if status_code != 200 else 500
 
 def place_order(
     order_data: Dict[str, Any],
@@ -250,8 +292,16 @@ def place_order(
         # Also add apikey to order_data for validation
         order_data['apikey'] = api_key
     
+    # Determine whether API key/strategy fields are required
+    require_api = not (auth_token and broker) or api_key is not None
+    require_strategy = require_api
+
     # Validate the order data
-    is_valid, validated_data, error_message = validate_order_data(order_data)
+    is_valid, validated_data, error_message = validate_order_data(
+        order_data,
+        require_apikey=require_api,
+        require_strategy=require_strategy,
+    )
     if not is_valid:
         if get_analyze_mode():
             return False, emit_analyzer_error(original_data, error_message), 400
