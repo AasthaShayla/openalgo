@@ -1,6 +1,8 @@
-from marshmallow import Schema, fields
+from marshmallow import Schema, fields, EXCLUDE
 
 class OrderSchema(Schema):
+    class Meta:
+        unknown = EXCLUDE
     apikey = fields.Str(required=True)
     strategy = fields.Str(required=True)
     exchange = fields.Str(required=True)
