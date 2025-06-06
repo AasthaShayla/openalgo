@@ -171,9 +171,15 @@
                         </a>
                     </li>
                     <li>
-                        <a href="{{ url_for('strategy_bp.index') }}" 
+                        <a href="{{ url_for('strategy_bp.index') }}"
                            class="{{ 'active' if request.endpoint.startswith('strategy_bp.') }}">
                             Strategy
+                        </a>
+                    </li>
+                    <li>
+                        <a href="{{ url_for('manual_bp.manual_order') }}"
+                           class="{{ 'active' if request.endpoint.startswith('manual_bp.') }}">
+                            Manual Order
                         </a>
                     </li>
                     <div class="divider"></div>
