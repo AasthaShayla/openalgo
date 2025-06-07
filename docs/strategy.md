@@ -411,6 +411,29 @@ except Exception as e:
     print(f"Unexpected error: {e}")
 ```
 
+#### 4. Simple Webhook Loop Example
+```python
+import requests
+import time
+
+host_url = "http://127.0.0.1:5000"  # Update if different
+webhook_id = "your-webhook-id"       # Replace with your ID
+symbol = "NIFTY"                      # Replace with configured symbol
+
+webhook_url = f"{host_url}/strategy/webhook/{webhook_id}"
+
+while True:
+    payload = {"symbol": symbol, "action": "BUY"}
+    try:
+        resp = requests.post(webhook_url, json=payload, timeout=5)
+        print("Status:", resp.status_code, resp.text)
+    except requests.exceptions.RequestException as err:
+        print("Request failed:", err)
+    time.sleep(10)
+```
+
+This script posts a BUY order every 10 seconds. Customize the parameters for your own strategy, then run it with `python strategies/webhook_buy_loop.py`.
+
 ### How Webhook Processing Works
 
 1. **Signal Reception**:
